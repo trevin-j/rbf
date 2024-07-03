@@ -1,3 +1,65 @@
+#![warn(missing_docs)]
+
+//! # RBF -- Rust BrainF***
+//!
+//! RBF is a BrainF*** interpreter and soon to be compiler.
+//!
+//! **TODO: Update this documentation once main.rs is done.**
+//!
+//! RBF can be installed via `cargo install rbf`. Alternatively, you may use the crate as a library
+//! by adding it as a dependency e.g. `cargo add rbf`.
+//!
+//! **TODO: Add main.rs usage**
+//!
+//! Usage as a library is simple.
+//!
+//! # Example
+//!
+//! ```rust
+//! use std::io::Write; // Bring in Write trait to flush terminal write buffer.
+//! use console::Term;  // Use console crate for simple one-char input.
+//!
+//! fn main() {
+//!     let term = Term::stdout();           // Create console Term struct for single-char input.
+//!     let mut stdout = std::io::stdout();  // Get stdout for flushing current buffer.
+//!
+//!     // Create some instructions. This should print your usual hello world.
+//!     let example_instructions = ">>+<--[[<++>->-->+++>+<<<]-->++++]<<.<<-.<<..+++.>.<<-.>.+++.------.>>-.<+.>>.";
+//!
+//!     // Create a Program struct with the instructions.
+//!     let mut prgm = rbf::Program::from_string(example_instructions);
+//!
+//!     // Create some closures to tell the interpreter what to do for io operations.
+//!     // On a `,` take input. Here we define the input as reading a single char from the terminal.
+//!     let charin = || { term.read_char().expect("Error getting input.") };
+//!     // On a `.` we output a char. We define a closure to print and flush the output char.
+//!     let charout = |c| {
+//!         print!("{}", c);
+//!         stdout.flush().expect("Error flushing output.");
+//!     };
+//!
+//!     // Execute the instructions and print if we get an error.
+//!     match prgm.execute(charin, charout) {
+//!         Ok(()) => println!("\nProgram finished."),
+//!         Err(e) => eprintln!("\n{}", e),
+//!     };
+//! }
+//! ```
+//!
+//! Input and output is handled by the closures you define. You could capture output and read
+//! from preset or procedural input e.g.
+//!
+//! ```rust
+//! let mut output = String::new();
+//!
+//! let charin = || 'a'; // always read input as 'a'
+//! let charout = |c| output.push(c);
+//! ```
+
+/// Represents a BF instruction.
+///
+/// The `isize` values for MvPtr and MvValue are for future optimization purposes, representing
+/// multiple of a single command.
 #[derive(Debug, PartialEq, Clone)]
 enum Instruct {
     MvPtr(isize),
@@ -8,12 +70,37 @@ enum Instruct {
     CloseLoop,
 }
 
-// Process the raw string into instructions first. This allows for optimizations later on in the
-// interpretation process
+/// Holds each converted BF Instruct in a Vec to be interpretted.
+///
+/// `rbf::Instructions` contains a `Vec<Instruct>`. The `rbf::Instruct` enum, which is private, is an
+/// enum representing a single BF instruction. The Instructions struct implements methods to
+/// convert a string of BF instructions into the `Vec<Instruct>` that can be interpretted by the
+/// Program struct. `rbf::Instructions` will be used to optimize the code as well, such as combining
+/// multiple of the same instruction, and finding patterns such as multiplication loops.
+///
+/// # Examples
+///
+/// ```rust
+/// # use rbf::{Instructions, Program};
+/// let instructions = Instructions::from_string(",>,<.>.");
+/// let prgm = Program::new(instructions);
+/// ```
 #[derive(Debug, PartialEq, Clone)]
 pub struct Instructions(Vec<Instruct>);
 
 impl Instructions {
+    /// Convert a string slice of commands into an Instructions struct containing the converted instructions.
+    ///
+    /// # Arguments
+    ///
+    /// * `commands` - A string slice holding the raw BrainF*** instructions.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # use rbf::Instructions;
+    /// let instructions = Instructions::from_string(",>,<.>.");
+    /// ```
     pub fn from_string(commands: &str) -> Instructions {
         Instructions(commands.chars().fold(Vec::new(), |mut acc, c| {
             let instruction = match c {
@@ -35,7 +122,9 @@ impl Instructions {
     }
 }
 
-// NOTE: The Program struct takes ownership of the instructions.
+/// Holds the BF program's functionality.
+///
+/// It contains methods for execution such as stepwise executing and full-program executing.
 #[derive(Debug, PartialEq)]
 pub struct Program {
     instructions: Instructions,
@@ -48,6 +137,9 @@ pub struct Program {
 }
 
 impl Program {
+    /// Create a new program struct.
+    ///
+    /// Note that the instructions are moved into the Program struct's ownership.
     pub fn new(instructions: Instructions) -> Program {
         Program {
             instructions,
@@ -56,6 +148,10 @@ impl Program {
             cell_ptr: 0,
             loop_stack: vec![],
         }
+    }
+
+    pub fn from_string(instructions: &str) -> Program {
+        Self::new(Instructions::from_string(instructions))
     }
 
     pub fn execute<Fin, Fout>(&mut self, mut input: Fin, mut output: Fout) -> Result<(), String>
@@ -262,6 +358,6 @@ mod tests {
         let mut program = Program::new(instructions);
         let _ = program.execute(|| ' ', |charout| outstring.push(charout));
 
-        assert_eq!("Hello World!", outstring);
+        assert_eq!("Hello World!\n", outstring);
     }
 }
