@@ -1,5 +1,3 @@
-#![warn(missing_docs)]
-
 //! # RBF -- Rust BrainF***
 //!
 //! RBF is a BrainF*** interpreter and soon to be compiler.
@@ -29,17 +27,15 @@
 //!     // Create a Program struct with the instructions.
 //!     let mut prgm = rbf::Program::from_string(example_instructions);
 //!
-//!     // Create some closures to tell the interpreter what to do for io operations.
-//!     // On a `,` take input. Here we define the input as reading a single char from the terminal.
-//!     let charin = || { term.read_char().expect("Error getting input.") };
-//!     // On a `.` we output a char. We define a closure to print and flush the output char.
-//!     let charout = |c| {
-//!         print!("{}", c);
-//!         stdout.flush().expect("Error flushing output.");
-//!     };
+//!     // Create input and output for the BF interpreter.
+//!     let input = rbf::BasicInput::new();
+//!     let mut output = rbf::BasicOutput::new();
 //!
 //!     // Execute the instructions and print if we get an error.
-//!     match prgm.execute(charin, charout) {
+//!     // We define closures to tell the interpreter how to handle input and output.
+//!     // `rbf` provides basic io structs to handle one-char input and output, which we use for
+//!     // our input and output closures.
+//!     match prgm.execute(|| input.input_char(), |c| output.print_char(c)) {
 //!         Ok(()) => println!("\nProgram finished."),
 //!         Err(e) => eprintln!("\n{}", e),
 //!     };
@@ -55,6 +51,12 @@
 //! let charin = || 'a'; // always read input as 'a'
 //! let charout = |c| output.push(c);
 //! ```
+
+#![warn(missing_docs)]
+
+use std::io::Write;
+
+use console::Term;
 
 /// Represents a BF instruction.
 ///
@@ -125,6 +127,21 @@ impl Instructions {
 /// Holds the BF program's functionality.
 ///
 /// It contains methods for execution such as stepwise executing and full-program executing.
+///
+/// # Examples
+///
+/// Create Program struct directly from a string of BF code, and execute it.
+///
+/// ```rust
+/// # use rbf::*;
+/// let mut prgm = Program::from_string(",>,<.>.");
+///
+/// # let basic_input = BasicInput::new();
+/// # let mut basic_output = BasicOutput::new();
+/// # let input_closure = || basic_input.input_char();
+/// # let output_closure = |c| basic_output.print_char(c);
+/// prgm.execute(input_closure, output_closure).expect("Error in BF instructions.");
+/// ```
 #[derive(Debug, PartialEq)]
 pub struct Program {
     instructions: Instructions,
@@ -139,7 +156,8 @@ pub struct Program {
 impl Program {
     /// Create a new program struct.
     ///
-    /// Note that the instructions are moved into the Program struct's ownership.
+    /// This constructor requires the instructions to already be represented by an `Instructions`
+    /// struct.
     pub fn new(instructions: Instructions) -> Program {
         Program {
             instructions,
@@ -307,6 +325,76 @@ impl Program {
 
             current_instruction += 1;
         }
+    }
+}
+
+/// Basic input operation for BF.
+///
+/// Provides a method that can be used for the input of the BF program.
+///
+/// # Examples
+///
+/// ```rust
+/// # use rbf::*;
+/// let basic_input = BasicInput::new();
+///
+/// // Read single char from terminal.
+/// let c = basic_input.input_char();
+/// ```
+pub struct BasicInput {
+    term: Term,
+}
+
+/// Basic output operation for BF.
+///
+/// Provides a method for output of the BF program.
+///
+/// # Examples
+///
+/// ```rust
+/// # use rbf::*;
+/// let mut basic_output = BasicOutput::new();
+///
+/// // Output single char to terminal.
+/// basic_output.print_char('a');
+/// ```
+pub struct BasicOutput {
+    stdout: std::io::Stdout,
+}
+
+impl BasicInput {
+    /// Create new BasicInput struct.
+    pub fn new() -> Self {
+        Self {
+            term: Term::stdout(),
+        }
+    }
+
+    /// Input single char from terminal.
+    ///
+    /// If the terminal is not an interactive terminal, the terminal from the `console` crate
+    /// returns an error from `read_char()`. In this situation, this function will return a char
+    /// with ascii value of 0.
+    pub fn input_char(&self) -> char {
+        match self.term.read_char() {
+            Ok(c) => c,
+            Err(_) => 0u8 as char,
+        }
+    }
+}
+
+impl BasicOutput {
+    /// Create new BasicOutput struct.
+    pub fn new() -> Self {
+        Self {
+            stdout: std::io::stdout(),
+        }
+    }
+
+    /// Print single char to terminal.
+    pub fn print_char(&mut self, c: char) {
+        print!("{}", c);
+        self.stdout.flush().expect("Error flushing output");
     }
 }
 
