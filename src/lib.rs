@@ -144,12 +144,17 @@ impl Instructions {
 /// ```
 #[derive(Debug, PartialEq)]
 pub struct Program {
+    /// Instructions to execute.
     instructions: Instructions,
+    /// Pointer to where in the instructions we are currently looking.
     instruction_ptr: usize,
 
+    /// Program's memory -- Vec of cells in the ascii range of numbers.
     cells: Vec<u8>,
+    /// Current location in memory.
     cell_ptr: usize,
 
+    /// Simple var to manage loops.
     loop_stack: Vec<usize>,
 }
 
@@ -168,10 +173,22 @@ impl Program {
         }
     }
 
+    /// Create a new program directly from a string of BF code.
+    ///
+    /// This method is a wrapper of the Program::new() method, creating a new Instructions
+    /// struct from the instructions string first.
     pub fn from_string(instructions: &str) -> Program {
         Self::new(Instructions::from_string(instructions))
     }
 
+    /// Execute the entire BF program.
+    ///
+    /// Step-by-step interprets the entire BF program according to its Instructions.
+    ///
+    /// # Errors
+    ///
+    /// Will return an error if the instructions are invalid. These errors are runtime BF
+    /// errors.
     pub fn execute<Fin, Fout>(&mut self, mut input: Fin, mut output: Fout) -> Result<(), String>
     where
         Fin: FnMut() -> char,
@@ -187,6 +204,7 @@ impl Program {
         Ok(())
     }
 
+    /// Execute the next step in the BF program.
     pub fn step<Fin, Fout>(&mut self, input: Fin, output: Fout) -> Result<(), String>
     where
         Fin: FnOnce() -> char,
@@ -219,10 +237,15 @@ impl Program {
         Ok(())
     }
 
+    /// Check if the program has finished executing.
     pub fn done(&self) -> bool {
         self.instruction_ptr >= self.instructions.0.len()
     }
 
+    /// Move the cell pointer either right or left. BF instructions ">" and "<" respectively.
+    ///
+    /// Note that it takes an amount. If there are repeating ">" or "<" instructions, rather
+    /// than move multiple times in a row, it can be optimized and moved only once, x spaces.
     fn move_cell_pointer(&mut self, amount: &isize) -> Result<(), String> {
         self.cell_ptr = match self.cell_ptr.checked_add_signed(*amount) {
             Some(val) => val,
@@ -236,18 +259,22 @@ impl Program {
         Ok(())
     }
 
-    // Check the cells length and make sure it's long enough
-    // that cell_ptr is a valid index.
+    /// Check the cells length and make sure it's long enough such that cell_ptr is a valid index.
     fn validate_cells_length(&mut self) {
         while self.cells.len() <= self.cell_ptr {
             self.cells.push(0);
         }
     }
 
+    /// Increment/decrement current cell value by `amount`.
+    ///
+    /// Multiple subsequent calls to this can be replaced by a single call with the sum in
+    /// order to optimize.
     fn move_cell_value(&mut self, amount: &isize) {
         self.cells[self.cell_ptr] = self.cells[self.cell_ptr].wrapping_add_signed(*amount as i8);
     }
 
+    /// Using the input closure, retrieve a character into the cells at cell ptr.
     fn input_cell<F>(&mut self, input: F) -> Result<(), String>
     where
         F: FnOnce() -> char,
@@ -266,6 +293,7 @@ impl Program {
         }
     }
 
+    /// Output a character at current cell into the output closure.
     fn output_cell<F>(&self, output: F)
     where
         F: FnOnce(char),
@@ -273,6 +301,7 @@ impl Program {
         output(self.cells[self.cell_ptr] as char);
     }
 
+    /// Handle the open loop instructions, `[`.
     fn open_loop(&mut self) -> Result<(), String> {
         if self.cells[self.cell_ptr] > 0 {
             self.loop_stack.push(self.instruction_ptr);
@@ -286,6 +315,7 @@ impl Program {
         Ok(())
     }
 
+    /// Handle the close loop instruction, ']'.
     fn close_loop(&mut self) -> Result<(), String> {
         self.instruction_ptr = match self.loop_stack.pop() {
             Some(n) => n,
@@ -298,6 +328,7 @@ impl Program {
         Ok(())
     }
 
+    /// Find the associated close loop to our current open loop and go there.
     fn move_to_closed_loop(&mut self) -> Result<(), String> {
         let mut loopstack: Vec<usize> = vec![];
         let mut current_instruction = self.instruction_ptr + 1; // We don't want to add
