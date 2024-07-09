@@ -461,7 +461,19 @@ impl BasicOutput {
 
 #[cfg(test)]
 mod tests {
+    use core::panic;
+
     use super::*;
+
+    /// Execute program with blanks without boilerplate.
+    ///
+    /// Will panic in the case of a BF error.
+    fn blank_execute_prgm(prgm: &mut Program) {
+        let input = BasicInput::new();
+        let output = BasicOutput::new();
+
+        prgm.execute(|| input.blank(), |c| output.blank(c)).unwrap();
+    }
 
     #[test]
     fn str_to_instructions() {
@@ -499,15 +511,38 @@ mod tests {
     }
 
     #[test]
+    fn error_on_instruction_ptr_out_of_bounds() {
+        let mut prgm = Program::from_string("+-><[],.");
+
+        blank_execute_prgm(&mut prgm);
+
+        let input = BasicInput::new();
+        let output = BasicOutput::new();
+
+        match prgm.step(|| input.blank(), |c| output.blank(c)) {
+            Ok(()) => panic!("Program should have errored."),
+            Err(_) => {}
+        }
+    }
+
+    #[test]
+    fn program_from_string() {
+        let instructions_str = "+-><[],.";
+        let instructions = Instructions::from_string(instructions_str);
+
+        let prgm_from_str = Program::from_string(instructions_str);
+        let prgm_from_instructions = Program::new(instructions);
+
+        assert_eq!(prgm_from_str, prgm_from_instructions);
+    }
+
+    #[test]
     fn reset_program() {
         let instructions = Instructions::from_string("+-><[],.");
         let mut prgm = Program::new(instructions.clone());
         let static_prgm = Program::new(instructions);
 
-        let input = BasicInput::new();
-        let output = BasicOutput::new();
-
-        prgm.execute(|| input.blank(), |c| output.blank(c)).unwrap();
+        blank_execute_prgm(&mut prgm);
 
         assert_ne!(prgm, static_prgm);
 
