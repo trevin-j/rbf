@@ -167,6 +167,18 @@ pub struct Program {
 }
 
 impl Program {
+    /// Clear and reset the program state.
+    ///
+    /// Clears the cells, instruction pointer, cell pointer, and loop stack. Subsequently
+    /// calling `Program::execute()` or `Program::step()` will begin the program from the
+    /// beginning.
+    pub fn reset(&mut self) {
+        self.instruction_ptr = 0;
+        self.cells.clear();
+        self.cell_ptr = 0;
+        self.loop_stack.clear();
+    }
+
     /// Create a new program struct.
     ///
     /// This constructor requires the instructions to already be represented by an `Instructions`
