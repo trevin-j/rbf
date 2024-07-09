@@ -519,9 +519,8 @@ mod tests {
         let input = BasicInput::new();
         let output = BasicOutput::new();
 
-        match prgm.step(|| input.blank(), |c| output.blank(c)) {
-            Ok(()) => panic!("Program should have errored."),
-            Err(_) => {}
+        if let Ok(()) = prgm.step(|| input.blank(), |c| output.blank(c)) {
+            panic!("Program should have errored.");
         }
     }
 
