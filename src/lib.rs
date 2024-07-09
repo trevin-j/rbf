@@ -2,16 +2,24 @@
 //!
 //! RBF is a BrainF*** interpreter and soon to be compiler.
 //!
-//! **TODO: Update this documentation once main.rs is done.**
-//!
 //! RBF can be installed via `cargo install rbf`. Alternatively, you may use the crate as a library
 //! by adding it as a dependency e.g. `cargo add rbf`.
 //!
-//! **TODO: Add main.rs usage**
+//! # CLI Usage
 //!
-//! Usage as a library is simple.
+//! Run a program
 //!
-//! # Example
+//! ```sh
+//! rbf -p ./examples/hello_world
+//! ```
+//!
+//! Run code directly
+//!
+//! ```sh
+//! rbf -c ',>,<.>.'
+//! ```
+//!
+//! # Library Usage
 //!
 //! ```rust
 //! use std::io::Write; // Bring in Write trait to flush terminal write buffer.
