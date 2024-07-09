@@ -485,7 +485,7 @@ mod tests {
 
     #[test]
     fn create_program() {
-        let instructions = Instructions::from_string("+_<>[],.");
+        let instructions = Instructions::from_string("+-><[],.");
         let new_program = Program::new(instructions.clone());
         let custom_program = Program {
             instructions,
@@ -496,6 +496,24 @@ mod tests {
         };
 
         assert_eq!(new_program, custom_program);
+    }
+
+    #[test]
+    fn reset_program() {
+        let instructions = Instructions::from_string("+-><[],.");
+        let mut prgm = Program::new(instructions.clone());
+        let static_prgm = Program::new(instructions);
+
+        let input = BasicInput::new();
+        let output = BasicOutput::new();
+
+        prgm.execute(|| input.blank(), |c| output.blank(c)).unwrap();
+
+        assert_ne!(prgm, static_prgm);
+
+        prgm.reset();
+
+        assert_eq!(prgm, static_prgm);
     }
 
     #[test]
