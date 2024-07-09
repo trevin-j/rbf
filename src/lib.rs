@@ -19,6 +19,8 @@
 //! rbf -c ',>,<.>.'
 //! ```
 //!
+//! Use the `-h` flag to see all options.
+//!
 //! # Library Usage
 //!
 //! ```rust
