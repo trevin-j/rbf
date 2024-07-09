@@ -421,6 +421,11 @@ impl BasicInput {
         }
     }
 
+    /// Blank input, handy when benchmarking and input doesn't matter.
+    pub fn blank() -> char {
+        ' '
+    }
+
     /// Input single char from terminal.
     ///
     /// If the terminal is not an interactive terminal, the terminal from the `console` crate
@@ -441,6 +446,9 @@ impl BasicOutput {
             stdout: std::io::stdout(),
         }
     }
+
+    /// Blank output, handy when benchmarking and output doesn't matter.
+    pub fn blank(_: char) {}
 
     /// Print single char to terminal.
     pub fn print_char(&mut self, c: char) {
