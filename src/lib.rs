@@ -422,7 +422,7 @@ impl BasicInput {
     }
 
     /// Blank input, handy when benchmarking and input doesn't matter.
-    pub fn blank() -> char {
+    pub fn blank(&self) -> char {
         ' '
     }
 
@@ -448,7 +448,7 @@ impl BasicOutput {
     }
 
     /// Blank output, handy when benchmarking and output doesn't matter.
-    pub fn blank(_: char) {}
+    pub fn blank(&self, _: char) {}
 
     /// Print single char to terminal.
     pub fn print_char(&mut self, c: char) {
