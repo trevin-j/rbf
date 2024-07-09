@@ -63,10 +63,16 @@
 //! ```
 
 #![warn(missing_docs)]
+#![cfg_attr(all(coverage_nightly, test), feature(coverage_attribute))]
 
 use std::io::Write;
 
 use console::Term;
+
+pub mod errors;
+use errors::{BFError, BFErrorKind};
+
+type Result<T> = std::result::Result<T, BFError>;
 
 /// Represents a BF instruction.
 ///
@@ -211,7 +217,7 @@ impl Program {
     ///
     /// Will return an error if the instructions are invalid. These errors are runtime BF
     /// errors.
-    pub fn execute<Fin, Fout>(&mut self, mut input: Fin, mut output: Fout) -> Result<(), String>
+    pub fn execute<Fin, Fout>(&mut self, mut input: Fin, mut output: Fout) -> Result<()>
     where
         Fin: FnMut() -> char,
         Fout: FnMut(char),
@@ -227,7 +233,7 @@ impl Program {
     }
 
     /// Execute the next step in the BF program.
-    pub fn step<Fin, Fout>(&mut self, input: Fin, output: Fout) -> Result<(), String>
+    pub fn step<Fin, Fout>(&mut self, input: Fin, output: Fout) -> Result<()>
     where
         Fin: FnOnce() -> char,
         Fout: FnOnce(char),
@@ -237,7 +243,11 @@ impl Program {
 
         let instruction = match self.instructions.0.get(self.instruction_ptr) {
             Some(i) => i,
-            None => return Err(format!("Error: The current instruction pointer points to non existing instruction. Instruction pointer: {}. This may have been caused by continuing to call Program::step after it has already finished.", self.instruction_ptr)),
+            None => {
+                return Err(BFError {
+                    kind: BFErrorKind::InstructionBoundsError,
+                })
+            }
         };
 
         // println!( // Dirty debugging
@@ -268,13 +278,13 @@ impl Program {
     ///
     /// Note that it takes an amount. If there are repeating ">" or "<" instructions, rather
     /// than move multiple times in a row, it can be optimized and moved only once, x spaces.
-    fn move_cell_pointer(&mut self, amount: &isize) -> Result<(), String> {
+    fn move_cell_pointer(&mut self, amount: &isize) -> Result<()> {
         self.cell_ptr = match self.cell_ptr.checked_add_signed(*amount) {
             Some(val) => val,
             None => {
-                return Err(String::from(
-                    "Attempted to access cell out of bounds, likely before index 0.",
-                ))
+                return Err(BFError {
+                    kind: BFErrorKind::CellBoundsError,
+                })
             }
         };
 
@@ -297,7 +307,7 @@ impl Program {
     }
 
     /// Using the input closure, retrieve a character into the cells at cell ptr.
-    fn input_cell<F>(&mut self, input: F) -> Result<(), String>
+    fn input_cell<F>(&mut self, input: F) -> Result<()>
     where
         F: FnOnce() -> char,
     {
@@ -309,9 +319,9 @@ impl Program {
             self.cells[self.cell_ptr] = in_byte as u8;
             Ok(())
         } else {
-            Err(String::from(
-                "Input received a character larger than one byte.",
-            ))
+            Err(BFError {
+                kind: BFErrorKind::InvalidInput,
+            })
         }
     }
 
@@ -324,34 +334,35 @@ impl Program {
     }
 
     /// Handle the open loop instructions, `[`.
-    fn open_loop(&mut self) -> Result<(), String> {
+    fn open_loop(&mut self) -> Result<()> {
         if self.cells[self.cell_ptr] > 0 {
             self.loop_stack.push(self.instruction_ptr);
         } else {
-            match self.move_to_closed_loop() {
-                Ok(()) => (),
-                Err(e) => return Err(e),
-            };
+            self.move_to_closed_loop()?;
+            // match self.move_to_closed_loop() {
+            //     Ok(()) => (),
+            //     Err(e) => return Err(e),
+            // };
         }
 
         Ok(())
     }
 
     /// Handle the close loop instruction, ']'.
-    fn close_loop(&mut self) -> Result<(), String> {
+    fn close_loop(&mut self) -> Result<()> {
         self.instruction_ptr = match self.loop_stack.pop() {
             Some(n) => n,
             None => {
-                return Err(format!(
-                    "There is a close bracket with no matching opening bracket."
-                ))
+                return Err(BFError {
+                    kind: BFErrorKind::MissingOpen,
+                });
             }
         } - 1;
         Ok(())
     }
 
     /// Find the associated close loop to our current open loop and go there.
-    fn move_to_closed_loop(&mut self) -> Result<(), String> {
+    fn move_to_closed_loop(&mut self) -> Result<()> {
         let mut loopstack: Vec<usize> = vec![];
         let mut current_instruction = self.instruction_ptr + 1; // We don't want to add
                                                                 // current open loop to stack
@@ -359,9 +370,9 @@ impl Program {
             let instruction = match self.instructions.0.get(current_instruction) {
                 Some(i) => i,
                 None => {
-                    return Err(format!(
-                        "There is an open bracket with no matching closing bracket."
-                    ))
+                    return Err(BFError {
+                        kind: BFErrorKind::MissingClose,
+                    });
                 }
             };
 
@@ -461,9 +472,10 @@ impl BasicOutput {
 
 #[cfg(test)]
 mod tests {
-    use core::panic;
-
     use super::*;
+
+    // Exclude tests themselves from coverage.
+    use coverage_helper::test;
 
     /// Execute program with blanks without boilerplate.
     ///
