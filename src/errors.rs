@@ -4,7 +4,7 @@ use core::fmt;
 use std::error;
 
 /// Represents the kind of `BracketMismatch`.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum BFErrorKind {
     /// When a closing bracket has no opening.
     MissingOpen,

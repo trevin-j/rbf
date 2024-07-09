@@ -63,7 +63,6 @@
 //! ```
 
 #![warn(missing_docs)]
-#![cfg_attr(all(coverage_nightly, test), feature(coverage_attribute))]
 
 use std::io::Write;
 
@@ -223,7 +222,7 @@ impl Program {
         Fout: FnMut(char),
     {
         loop {
-            if self.done() {
+            if self.done()? {
                 break;
             }
             self.step(|| input(), |c| output(c))?;
@@ -270,8 +269,18 @@ impl Program {
     }
 
     /// Check if the program has finished executing.
-    pub fn done(&self) -> bool {
-        self.instruction_ptr >= self.instructions.0.len()
+    pub fn done(&self) -> Result<bool> {
+        if self.instruction_ptr >= self.instructions.0.len() {
+            if self.loop_stack.len() > 0 {
+                Err(BFError {
+                    kind: BFErrorKind::MissingClose,
+                })
+            } else {
+                Ok(true)
+            }
+        } else {
+            Ok(false)
+        }
     }
 
     /// Move the cell pointer either right or left. BF instructions ">" and "<" respectively.
@@ -339,10 +348,6 @@ impl Program {
             self.loop_stack.push(self.instruction_ptr);
         } else {
             self.move_to_closed_loop()?;
-            // match self.move_to_closed_loop() {
-            //     Ok(()) => (),
-            //     Err(e) => return Err(e),
-            // };
         }
 
         Ok(())
@@ -474,17 +479,14 @@ impl BasicOutput {
 mod tests {
     use super::*;
 
-    // Exclude tests themselves from coverage.
-    use coverage_helper::test;
-
     /// Execute program with blanks without boilerplate.
     ///
     /// Will panic in the case of a BF error.
-    fn blank_execute_prgm(prgm: &mut Program) {
+    fn blank_execute_prgm(prgm: &mut Program) -> Result<()> {
         let input = BasicInput::new();
         let output = BasicOutput::new();
 
-        prgm.execute(|| input.blank(), |c| output.blank(c)).unwrap();
+        prgm.execute(|| input.blank(), |c| output.blank(c))
     }
 
     #[test]
@@ -523,17 +525,65 @@ mod tests {
     }
 
     #[test]
-    fn error_on_instruction_ptr_out_of_bounds() {
+    fn instruction_bounds_error() {
+        // Should error if trying to access instruction out of bounds e.g. stepping after
+        // program has already finished.
         let mut prgm = Program::from_string("+-><[],.");
 
-        blank_execute_prgm(&mut prgm);
+        blank_execute_prgm(&mut prgm).unwrap();
 
         let input = BasicInput::new();
         let output = BasicOutput::new();
 
-        if let Ok(()) = prgm.step(|| input.blank(), |c| output.blank(c)) {
-            panic!("Program should have errored.");
-        }
+        let result = prgm
+            .step(|| input.blank(), |c| output.blank(c))
+            .map_err(|e| e.kind);
+        let expected = Err(BFErrorKind::InstructionBoundsError);
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn cell_bounds_error() {
+        // Should error if we try to access a cell outside of bounds in BF.
+        let mut prgm = Program::from_string("<+");
+
+        let result = blank_execute_prgm(&mut prgm).map_err(|e| e.kind);
+        let expected = Err(BFErrorKind::CellBoundsError);
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn invalid_input() {
+        // If the BF program receives invalid input e.g. char values larger than 255.
+        let mut prgm = Program::from_string(",");
+
+        // Try passing too big a char as input.
+        let result = prgm.execute(|| '\u{10FFFF}', |_| ()).map_err(|e| e.kind);
+        let expected = Err(BFErrorKind::InvalidInput);
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn missing_open_bracket() {
+        let mut prgm = Program::from_string("++>+++>+.<.]-<+++");
+
+        let result = blank_execute_prgm(&mut prgm).map_err(|e| e.kind);
+        let expected = Err(BFErrorKind::MissingOpen);
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn missing_close_bracket() {
+        // Situation where it wouldn't yet skip to closing bracket
+        let mut prgm = Program::from_string("++>+++>+.<.[-<+++");
+        // Situation where it would
+        let mut prgm2 = Program::from_string("++>+++>+.<.>>>[-<+++");
+
+        let result = blank_execute_prgm(&mut prgm).map_err(|e| e.kind);
+        let result2 = blank_execute_prgm(&mut prgm2).map_err(|e| e.kind);
+        let expected = Err(BFErrorKind::MissingClose);
+        assert_eq!(result, expected);
+        assert_eq!(result2, expected);
     }
 
     #[test]
@@ -553,7 +603,7 @@ mod tests {
         let mut prgm = Program::new(instructions.clone());
         let static_prgm = Program::new(instructions);
 
-        blank_execute_prgm(&mut prgm);
+        blank_execute_prgm(&mut prgm).unwrap();
 
         assert_ne!(prgm, static_prgm);
 
