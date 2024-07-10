@@ -27,12 +27,17 @@ struct Cli {
     /// Use blank IO, useful for benchmarking.
     #[arg(long)]
     blank_io: bool,
+
+    /// Run internal optimization on the BF code.
+    #[arg(short, long)]
+    optimize: bool,
 }
 
 fn main() {
     let cli = Cli::parse();
 
     let mut prgm: rbf::Program;
+    let mut instructions: rbf::Instructions;
 
     if let Some(program) = cli.program.as_deref() {
         let program_contents: String;
@@ -44,13 +49,20 @@ fn main() {
                 return;
             }
         }
-        prgm = rbf::Program::from_string(&program_contents);
+
+        instructions = rbf::Instructions::from_string(&program_contents);
     } else if let Some(code) = cli.code.as_deref() {
-        prgm = rbf::Program::from_string(code);
+        instructions = rbf::Instructions::from_string(code);
     } else {
         println!("Must pass code via code or program argument.");
         return;
     }
+
+    if cli.optimize {
+        instructions.optimize();
+    }
+
+    prgm = rbf::Program::new(instructions);
 
     let input = rbf::BasicInput::new();
     let mut output = rbf::BasicOutput::new();
