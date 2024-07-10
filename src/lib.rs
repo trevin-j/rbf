@@ -137,6 +137,61 @@ impl Instructions {
             acc
         }))
     }
+
+    /// Perform optimizations on the BF code.
+    pub fn optimize(&mut self) {
+        self.optimize_combine_multiples();
+    }
+
+    /// Optimize the code by combining MvValue and MvPtr instructions to greatly reduce the
+    /// overall number of instructions.
+    pub fn optimize_combine_multiples(&mut self) {
+        let mut holding_instruction: Option<Instruct> = None;
+        let mut new_instructions = vec![];
+
+        let mut new_matches_holding;
+
+        for instruction in &self.0 {
+            new_matches_holding = false;
+
+            // Check if the current instruction is the same as the one we are holding.
+            // If they are the same, combine the values and keep holding.
+            // If they are different, the holding gets added to the instructions and we now
+            // hold the new one.
+            match instruction {
+                Instruct::MvPtr(n) => {
+                    if let Some(ref mut instruct) = holding_instruction {
+                        if let Instruct::MvPtr(m) = *instruct {
+                            *instruct = Instruct::MvPtr(m + n);
+                            new_matches_holding = true;
+                        }
+                    }
+                }
+                Instruct::MvValue(n) => {
+                    if let Some(ref mut instruct) = holding_instruction {
+                        if let Instruct::MvValue(m) = *instruct {
+                            *instruct = Instruct::MvValue(m + n);
+                            new_matches_holding = true;
+                        }
+                    }
+                }
+                _ => (),
+            }
+            if !new_matches_holding {
+                if let Some(instruct) = holding_instruction {
+                    new_instructions.push(instruct);
+                }
+                holding_instruction = Some(instruction.clone());
+            }
+        }
+
+        // We can't forget to put the holding one onto the new instructions.
+        if let Some(instruct) = holding_instruction {
+            new_instructions.push(instruct);
+        }
+
+        self.0 = new_instructions;
+    }
 }
 
 /// Holds the BF program's functionality.
@@ -522,6 +577,92 @@ mod tests {
         };
 
         assert_eq!(new_program, custom_program);
+    }
+
+    #[test]
+    fn optimize_multiples() {
+        use Instruct::*;
+
+        let mut instructions = Instructions::from_string("++++>>++++-<>>>-<");
+        instructions.optimize_combine_multiples();
+
+        let expected = Instructions(vec![
+            MvValue(4),
+            MvPtr(2),
+            MvValue(3),
+            MvPtr(2),
+            MvValue(-1),
+            MvPtr(-1),
+        ]);
+
+        assert_eq!(instructions, expected);
+
+        let mut instructions = Instructions::from_string("++++++++[>++++[>++>+++>+++>+<<<<-]>+>+>->>+[<]<-]>>.>---.+++++++..+++.>>.<-.<.+++.------.--------.>>+.>++.");
+        instructions.optimize_combine_multiples();
+
+        let expected = Instructions(vec![
+            MvValue(8),
+            OpenLoop,
+            MvPtr(1),
+            MvValue(4),
+            OpenLoop,
+            MvPtr(1),
+            MvValue(2),
+            MvPtr(1),
+            MvValue(3),
+            MvPtr(1),
+            MvValue(3),
+            MvPtr(1),
+            MvValue(1),
+            MvPtr(-4),
+            MvValue(-1),
+            CloseLoop,
+            MvPtr(1),
+            MvValue(1),
+            MvPtr(1),
+            MvValue(1),
+            MvPtr(1),
+            MvValue(-1),
+            MvPtr(2),
+            MvValue(1),
+            OpenLoop,
+            MvPtr(-1),
+            CloseLoop,
+            MvPtr(-1),
+            MvValue(-1),
+            CloseLoop,
+            MvPtr(2),
+            Output,
+            MvPtr(1),
+            MvValue(-3),
+            Output,
+            MvValue(7),
+            Output,
+            Output,
+            MvValue(3),
+            Output,
+            MvPtr(2),
+            Output,
+            MvPtr(-1),
+            MvValue(-1),
+            Output,
+            MvPtr(-1),
+            Output,
+            MvValue(3),
+            Output,
+            MvValue(-6),
+            Output,
+            MvValue(-8),
+            Output,
+            MvPtr(2),
+            MvValue(1),
+            Output,
+            MvPtr(1),
+            MvValue(2),
+            Output,
+        ]);
+
+        assert_eq!(instructions, expected);
     }
 
     #[test]
