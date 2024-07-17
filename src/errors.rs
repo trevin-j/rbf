@@ -3,7 +3,7 @@
 use core::fmt;
 use std::error;
 
-/// Represents the kind of `BracketMismatch`.
+/// Represents the kind of BF error.
 #[derive(Debug, Clone, PartialEq)]
 pub enum BFErrorKind {
     /// When a closing bracket has no opening.
@@ -18,9 +18,9 @@ pub enum BFErrorKind {
     InstructionBoundsError,
 }
 
-/// Represents a BF error where not all brackets have matches.
+/// Represents a BF error.
 ///
-/// Match `BracketMismatch::kind` to determine if it's an open bracket or close bracket error.
+/// Match the `kind` field to determine what the error is.
 #[derive(Debug, Clone)]
 pub struct BFError {
     /// Kind of mismatch.
